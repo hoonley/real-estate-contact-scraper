@@ -1,7 +1,7 @@
 import pandas as pd 
 
 #ignores the first row since it contains county info
-df = pd.read_csv("input/lender search sample.csv", skiprows = 1)
+df = pd.read_csv("input/sample.csv", skiprows = 1)
 
 #use second row as header
 df.columns = df.iloc[0]
