@@ -5,13 +5,21 @@ BUSINESS_KEYWORDS = [
 ]
 
 def classify_name(name: str, lender_name: str = "") -> str:
-    """
-    Classifies an owner name as 'company', 'individual', 'ignored', or 'unknown'.
-
-    Ignores rows where either the lender name OR owner name ends with 'trust'.
-    """
     if pd.isna(name):
         return "unknown"
+
+    name_str = name.strip().lower() if isinstance(name, str) else ""
+    lender_str = lender_name.strip().lower() if isinstance(lender_name, str) else ""
+
+    if name_str.endswith("trust") or lender_str.endswith("trust"):
+        return "ignored"
+
+    name_upper = name.upper().strip()
+    if any(keyword in name_upper for keyword in BUSINESS_KEYWORDS):
+        return "company"
+
+    return "individual"
+
 
     name_str = name.strip().lower() if isinstance(name, str) else ""
     lender_str = lender_name.strip().lower() if isinstance(lender_name, str) else ""
