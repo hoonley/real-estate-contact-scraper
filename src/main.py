@@ -1,43 +1,30 @@
-import os
 import pandas as pd
-from classify import classify_name
-#from scraper_bizfile import run_scraper
+from classify import classify_name, split_owner_names
 
 INPUT_FILE = "input/sample.csv"
-CLASSIFIED_OUTPUT = "output/sample3.csv"
-
-def load_and_classify(filepath=INPUT_FILE):
-    """
-    Loads the CSV file, skips metadata rows, classifies owner types.
-    """
-    # Load CSV, skip first metadata row
-    df = pd.read_csv(filepath, skiprows=1)
-    df.columns = df.iloc[0]  # Use the second row as header
-    df = df[1:].reset_index(drop=True)
-
-    # Apply classification to each row
-    df["Owner Type"] = df.apply(
-        lambda row: classify_name(row["Owner Name"], row["Lender Name"]),
-        axis=1
-    )
-
-    return df
+OUTPUT_FILE = "output/sample_output4.csv"
 
 def main():
-    print("📂 Loading and classifying data...")
-    df = load_and_classify()
+    # Step 1: Load and clean CSV
+    df = pd.read_csv(INPUT_FILE, skiprows=1)
+    df.columns = df.iloc[0]
+    df = df[1:].reset_index(drop=True)
 
-    os.makedirs("output", exist_ok=True)
-    df.to_csv(CLASSIFIED_OUTPUT, index=False)
-    print(f"✅ Saved classified data to {CLASSIFIED_OUTPUT}")
+    # Step 2: Strip whitespace from relevant fields
+    df["Owner Name"] = df["Owner Name"].astype(str).str.strip()
+    df["Lender Name"] = df["Lender Name"].astype(str).str.strip()
 
-    # Filter out companies only
-    company_df = df[df["Owner Type"] == "company"]
-    company_names = company_df["Owner Name"].dropna().unique()
+    # Step 3: Split owners by '/' into separate rows
+    df = split_owner_names(df)
 
-    print(f"🔍 Starting scraper for {len(company_names)} company names...")
-    #run_scraper(company_names)
-    print("🎉 Scraping complete!")
+    # Step 4: Classify each owner
+    df["Owner Type"] = df.apply(
+        lambda row: classify_name(row["Owner Name"], row["Lender Name"]), axis=1
+    )
+
+    # Step 5: Save the new DataFrame
+    df.to_csv(OUTPUT_FILE, index=False)
+    print(f"✅ Done! Output saved to {OUTPUT_FILE}")
 
 if __name__ == "__main__":
     main()
