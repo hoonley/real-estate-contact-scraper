@@ -4,7 +4,7 @@ from classify import classify_name
 #from scraper_bizfile import run_scraper
 
 INPUT_FILE = "input/sample.csv"
-CLASSIFIED_OUTPUT = "output/sample.csv"
+CLASSIFIED_OUTPUT = "output/sample2.csv"
 
 def load_and_classify(filepath=INPUT_FILE):
     """
