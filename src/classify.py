@@ -1,9 +1,10 @@
 import pandas as pd
 
-# Expanded list with your recent addition "LL"
+# Keywords to categorize "business"
 BUSINESS_KEYWORDS = [
-    "LLC", "LL", "INC", "CORP", "CO", "COMPANY", "LTD", "LP", "PC",
-    "LLP", "HOLDINGS", "GROUP", "ENTERPRISES"
+    "LLC", "LL", "INC", "CORP", "CO", "COMPANY", "LTD", "LP", "PC", "LLP", 
+    "HOLDINGS", "GROUP", "ENTERPRISES", "INVESTMENTS", "VENTURES", 
+    "PROPERTIES", "REALTY", "ESTATE", "CAP", "HOMES", "BUILDERS", "DEVELOPMENT", "TRUST"
 ]
 
 def classify_name(name: str, lender_name: str = "") -> str:
