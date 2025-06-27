@@ -1,5 +1,6 @@
 import pandas as pd
 import time
+import random
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
@@ -15,7 +16,7 @@ def setup_driver():
 
 def search_skip_genie(first_name, last_name, street_address, zip_code, driver):
     # Open the Skip Genie dashboard or search page
-    driver.get("https://app.skipgenie.com/dashboard")
+    driver.get("https://web.skipgenie.com/user/search")
     time.sleep(2)
 
     # Fill First Name
@@ -99,6 +100,8 @@ def main():
                 "ZIP Code": zip_code,
                 "Skip Genie Result": f"ERROR: {e}"
             })
+        #random pause 10-15 seconds for rate limiters
+        time.sleep(random.uniform(10, 15))
 
     driver.quit()
 
