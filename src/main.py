@@ -2,7 +2,7 @@ import pandas as pd
 from classify import classify_name, split_owner_names
 
 INPUT_FILE = "input/sample.csv"
-OUTPUT_FILE = "output/sample_output4.csv"
+OUTPUT_FILE = "output/sample_output5.csv"
 
 def main():
     # Step 1: Load and clean CSV
