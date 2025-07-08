@@ -44,40 +44,48 @@ def search_skip_genie(first_name, last_name, street_address, zip_code, driver):
     # Click "Get Info"
     driver.find_element(By.CSS_SELECTOR, ".pu_btn_user_search").click()
 
-    # Wait for the confirmation popup and robustly try to click "YES, EXECUTE SEARCH"
+    # --- Robustly Click the "Yes, Execute Search" Button with Hover/Animation Support ---
     try:
-        # Case-insensitive, extra wait for button to be visible
-        yes_button = WebDriverWait(driver, 15).until(
-            EC.visibility_of_element_located((
-                By.XPATH,
-                "//button[translate(normalize-space(text()), 'abcdefghijklmnopqrstuvwxyz', 'ABCDEFGHIJKLMNOPQRSTUVWXYZ') = 'YES, EXECUTE SEARCH']"
-            ))
+        WebDriverWait(driver, 15).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "button.pu_btn"))
         )
-        driver.execute_script("arguments[0].scrollIntoView(true);", yes_button)
-        time.sleep(1)  # Extra wait for animation
+        time.sleep(1)  # Wait for any animation
 
-        # Try JS click first
-        driver.execute_script("arguments[0].click();", yes_button)
-        print("✅ JS click on Yes, Execute Search")
+        all_buttons = driver.find_elements(By.CSS_SELECTOR, "button.pu_btn")
+        found = False
+        for btn in all_buttons:
+            btn_text = btn.text.strip()
+            print("BTN FOUND:", repr(btn_text))
+            if btn_text.startswith("Yes, Execute Search"):
+                try:
+                    # Hover over the button to trigger animation/enable
+                    actions = ActionChains(driver)
+                    actions.move_to_element(btn).perform()
+                    print("🟢 Hovered over button")
+                    time.sleep(1.5)  # Give animation/transition time
 
-        # If still present, try ActionChains
-        time.sleep(0.5)
-        if yes_button.is_displayed():
-            actions = ActionChains(driver)
-            actions.move_to_element(yes_button).click().perform()
-            print("✅ ActionChains click on Yes, Execute Search")
-
-        # As a last resort, try sending ENTER key to the focused button
-        time.sleep(0.5)
-        if yes_button.is_displayed():
-            yes_button.send_keys("\n")
-            print("✅ Sent ENTER to Yes, Execute Search")
+                    # Now try a regular click
+                    btn.click()
+                    print("✅ Click after hover worked")
+                    found = True
+                    break
+                except Exception as e:
+                    print("⚠️ Click after hover failed:", e)
+                # Try JS click after hover if needed
+                try:
+                    driver.execute_script("arguments[0].click();", btn)
+                    print("✅ JS click after hover worked")
+                    found = True
+                    break
+                except Exception as e:
+                    print("⚠️ JS click after hover failed:", e)
+        if not found:
+            print("❌ Could not click any Yes, Execute Search button after hover.")
     except Exception as e:
         print("❌ Still could not click the confirmation button:", e)
-        print("🔎 Debug: Listing all visible button texts on the page:")
-        buttons = driver.find_elements(By.TAG_NAME, "button")
-        for b in buttons:
-            print("BUTTON:", repr(b.text))
+        all_buttons = driver.find_elements(By.CSS_SELECTOR, "button.pu_btn")
+        for btn in all_buttons:
+            print("BUTTON HTML:", btn.get_attribute("outerHTML"))
         return ""
 
     # Wait for results to load
