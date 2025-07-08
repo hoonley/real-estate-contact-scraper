@@ -3,19 +3,19 @@ import time
 import random
 from selenium import webdriver
 from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
 from selenium.common.exceptions import NoSuchElementException
+from tqdm import tqdm  # Progress bar
 
 def setup_driver():
     options = webdriver.ChromeOptions()
     options.add_argument("--window-size=1200,800")
-    # Uncomment the next line for headless (no-browser) mode:
+    # Uncomment for headless (background) mode:
     # options.add_argument("--headless=new")
     driver = webdriver.Chrome(options=options)
     return driver
 
 def search_skip_genie(first_name, last_name, street_address, zip_code, driver):
-    # Open the Skip Genie dashboard or search page
+    # Open the Skip Genie dashboard/search page
     driver.get("https://web.skipgenie.com/user/search")
     time.sleep(2)
 
@@ -43,16 +43,17 @@ def search_skip_genie(first_name, last_name, street_address, zip_code, driver):
     get_info_btn = driver.find_element(By.CSS_SELECTOR, ".pu_btn_user_search")
     driver.execute_script("arguments[0].click();", get_info_btn)
 
-    # Wait for results to load (increase time if needed)
+    # Wait for results to load
     time.sleep(4)
 
-    # Try to get the results text - adjust selector as needed!
     try:
-        # You may need to update this selector for your real results
         results_div = driver.find_element(By.CSS_SELECTOR, ".results-container")
         results_text = results_div.text
     except NoSuchElementException:
         results_text = "No results found or selector needs update."
+        # Save the page source for debugging
+        with open("output/last_page_source.html", "w", encoding="utf-8") as f:
+            f.write(driver.page_source)
 
     return results_text
 
@@ -64,22 +65,27 @@ def split_name(owner_name):
     return first, last
 
 def main():
-    # Load processed CSV with all rows split/classified
     df = pd.read_csv("output/owners_split_classified.csv")
     individuals_df = df[df["Owner Type"] == "individual"].copy()
 
     driver = setup_driver()
 
-    # Pause for manual login (if not using cookies/session automation)
-    input("\n🔑 Log in to Skip Genie in the opened browser. When you're on the dashboard/search page, press ENTER here...")
+    # Pause for manual login
+    input("\n🔑 Log in to Skip Genie in the opened browser. When you're ready, press ENTER here...")
 
     results = []
-    for idx, row in individuals_df.iterrows():
+    output_file = "output/skip_genie_results.csv"
+
+    for idx, row in tqdm(individuals_df.iterrows(), total=len(individuals_df)):
         owner_name = row["Owner Name"]
         street_address = row.get("Address", "")
-        zip_code = str(row.get("ZIP Code", ""))  # Make sure zip is string
+        zip_code = str(row.get("ZIP Code", ""))
 
         first_name, last_name = split_name(owner_name)
+
+        if not first_name or not last_name:
+            print(f"⏭️ Skipping '{owner_name}' due to missing first or last name.")
+            continue
 
         print(f"🔎 Searching: {first_name} {last_name} | {street_address} | {zip_code}")
         try:
@@ -100,13 +106,18 @@ def main():
                 "ZIP Code": zip_code,
                 "Skip Genie Result": f"ERROR: {e}"
             })
-        #random pause 10-15 seconds for rate limiters
+
+        # Save every 20 searches as a checkpoint
+        if idx % 20 == 0 and idx != 0:
+            pd.DataFrame(results).to_csv(output_file, index=False)
+            print(f"💾 Progress saved after {idx} searches.")
+
+        # Random pause 10-15 seconds for rate limiters
         time.sleep(random.uniform(10, 15))
 
     driver.quit()
 
-    # Save all results
-    output_file = "output/skip_genie_results.csv"
+    # Final save
     pd.DataFrame(results).to_csv(output_file, index=False)
     print(f"\n✅ Done! Results saved to {output_file}")
 
