@@ -3,16 +3,16 @@ import time
 import random
 from selenium import webdriver
 from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
 from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.action_chains import ActionChains
 from tqdm import tqdm
 
 def setup_driver():
     options = webdriver.ChromeOptions()
     options.add_argument("--window-size=1200,800")
-    # options.add_argument("--headless=new")  # Uncomment if you want headless mode
+    # options.add_argument("--headless=new")  # Uncomment for headless mode
     driver = webdriver.Chrome(options=options)
     return driver
 
@@ -44,15 +44,24 @@ def search_skip_genie(first_name, last_name, street_address, zip_code, driver):
     # Click "Get Info"
     driver.find_element(By.CSS_SELECTOR, ".pu_btn_user_search").click()
 
-    # Wait for and click the confirmation button
+    # Wait for the confirmation popup and force-click "YES, EXECUTE SEARCH"
     try:
         yes_button = WebDriverWait(driver, 10).until(
-            EC.element_to_be_clickable((By.XPATH, "//button[text()='Yes, Execute Search']"))
+            EC.element_to_be_clickable((By.XPATH, "//button[text()='YES, EXECUTE SEARCH']"))
         )
-        yes_button.click()
-        print("✅ Clicked Yes, Execute Search")
+        driver.execute_script("arguments[0].scrollIntoView(true);", yes_button)
+        time.sleep(0.5)
+        # Try ActionChains as a last resort (for stubborn buttons/modals)
+        actions = ActionChains(driver)
+        actions.move_to_element(yes_button).click().perform()
+        print("✅ Force-clicked Yes, Execute Search with ActionChains")
     except Exception as e:
-        print("❌ Could not click the confirmation button:", e)
+        print("❌ Still could not click the confirmation button:", e)
+        print("🔎 Debug: Listing all visible button texts on the page:")
+        buttons = driver.find_elements(By.TAG_NAME, "button")
+        for b in buttons:
+            print("BUTTON:", repr(b.text))
+        return ""
 
     # Wait for results to load
     time.sleep(4)
@@ -65,14 +74,16 @@ def search_skip_genie(first_name, last_name, street_address, zip_code, driver):
     return results_text
 
 def main():
-    input_path = "output/owners_split_classified.csv"  # Adjust if your file is elsewhere
+    input_path = "output/owners_split_classified.csv"
     output_path = "output/skip_genie_results.csv"
 
     df = pd.read_csv(input_path)
     individuals_df = df[df["Owner Type"] == "individual"].copy()
 
     driver = setup_driver()
-    input("\n🔑 Log in to Skip Genie in the browser, navigate to the search page, then press Enter here to begin...")
+    driver.get("https://web.skipgenie.com/user/search")
+
+    input("\n🔑 Log in to Skip Genie in the opened browser. When you're on the search page, press ENTER here...")
 
     results = []
 
