@@ -15,7 +15,6 @@ def setup_driver():
     return driver
 
 def search_skip_genie(first_name, last_name, street_address, zip_code, driver):
-    # Open the Skip Genie dashboard/search page
     driver.get("https://web.skipgenie.com/user/search")
     time.sleep(2)
 
@@ -58,10 +57,16 @@ def search_skip_genie(first_name, last_name, street_address, zip_code, driver):
     return results_text
 
 def split_name(owner_name):
-    # Naive split: First is first word, last is last word
+    # Assumes owner_name is in "LAST FIRST [MIDDLE]" format (reverse to first, last)
     parts = owner_name.strip().split()
-    first = parts[0] if parts else ""
-    last = parts[-1] if len(parts) > 1 else ""
+    if len(parts) >= 2:
+        last = parts[0]
+        first = " ".join(parts[1:])
+    elif len(parts) == 1:
+        last = parts[0]
+        first = ""
+    else:
+        last = first = ""
     return first, last
 
 def main():
@@ -70,7 +75,6 @@ def main():
 
     driver = setup_driver()
 
-    # Pause for manual login
     input("\n🔑 Log in to Skip Genie in the opened browser. When you're ready, press ENTER here...")
 
     results = []
