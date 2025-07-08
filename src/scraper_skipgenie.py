@@ -44,16 +44,15 @@ def search_skip_genie(first_name, last_name, street_address, zip_code, driver):
     # Click "Get Info"
     driver.find_element(By.CSS_SELECTOR, ".pu_btn_user_search").click()
 
-    # Wait for the confirmation popup and click "YES, EXECUTE SEARCH"
+    # Wait for and click the confirmation button
     try:
         yes_button = WebDriverWait(driver, 10).until(
-            EC.element_to_be_clickable((By.XPATH, "//button[contains(., 'YES, EXECUTE SEARCH')]"))
+            EC.element_to_be_clickable((By.XPATH, "//button[text()='Yes, Execute Search']"))
         )
         yes_button.click()
-        print("✅ Clicked YES, EXECUTE SEARCH")
+        print("✅ Clicked Yes, Execute Search")
     except Exception as e:
-        print("❌ Confirmation button not found or not clickable:", e)
-        return ""
+        print("❌ Could not click the confirmation button:", e)
 
     # Wait for results to load
     time.sleep(4)
