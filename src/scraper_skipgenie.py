@@ -44,17 +44,34 @@ def search_skip_genie(first_name, last_name, street_address, zip_code, driver):
     # Click "Get Info"
     driver.find_element(By.CSS_SELECTOR, ".pu_btn_user_search").click()
 
-    # Wait for the confirmation popup and force-click "YES, EXECUTE SEARCH"
+    # Wait for the confirmation popup and robustly try to click "YES, EXECUTE SEARCH"
     try:
-        yes_button = WebDriverWait(driver, 10).until(
-            EC.element_to_be_clickable((By.XPATH, "//button[text()='YES, EXECUTE SEARCH']"))
+        # Case-insensitive, extra wait for button to be visible
+        yes_button = WebDriverWait(driver, 15).until(
+            EC.visibility_of_element_located((
+                By.XPATH,
+                "//button[translate(normalize-space(text()), 'abcdefghijklmnopqrstuvwxyz', 'ABCDEFGHIJKLMNOPQRSTUVWXYZ') = 'YES, EXECUTE SEARCH']"
+            ))
         )
         driver.execute_script("arguments[0].scrollIntoView(true);", yes_button)
+        time.sleep(1)  # Extra wait for animation
+
+        # Try JS click first
+        driver.execute_script("arguments[0].click();", yes_button)
+        print("✅ JS click on Yes, Execute Search")
+
+        # If still present, try ActionChains
         time.sleep(0.5)
-        # Try ActionChains as a last resort (for stubborn buttons/modals)
-        actions = ActionChains(driver)
-        actions.move_to_element(yes_button).click().perform()
-        print("✅ Force-clicked Yes, Execute Search with ActionChains")
+        if yes_button.is_displayed():
+            actions = ActionChains(driver)
+            actions.move_to_element(yes_button).click().perform()
+            print("✅ ActionChains click on Yes, Execute Search")
+
+        # As a last resort, try sending ENTER key to the focused button
+        time.sleep(0.5)
+        if yes_button.is_displayed():
+            yes_button.send_keys("\n")
+            print("✅ Sent ENTER to Yes, Execute Search")
     except Exception as e:
         print("❌ Still could not click the confirmation button:", e)
         print("🔎 Debug: Listing all visible button texts on the page:")
