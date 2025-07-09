@@ -3,128 +3,129 @@ import time
 import random
 from selenium import webdriver
 from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
 from selenium.common.exceptions import NoSuchElementException
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.common.action_chains import ActionChains
-from tqdm import tqdm
+import pyautogui
+
+# ========== CONFIGURATION ==========
+CONFIRM_BTN_X = 1302   # update if your button moves!
+CONFIRM_BTN_Y = 900    # update this to the lower Y you measured!
+PAUSE_BETWEEN_SEARCHES = (10, 15)  # seconds, random between searches
 
 def setup_driver():
     options = webdriver.ChromeOptions()
     options.add_argument("--window-size=1200,800")
-    # options.add_argument("--headless=new")  # Uncomment for headless mode
+    # Uncomment for headless:
+    # options.add_argument("--headless=new")
     driver = webdriver.Chrome(options=options)
+    # Open Skip Genie search page immediately
+    driver.get("https://web.skipgenie.com/user/search")
     return driver
 
+
 def split_name(owner_name):
-    # Assumes "LAST FIRST" format
+    # Naive split: First word = first name, last word = last name
     parts = owner_name.strip().split()
-    if len(parts) >= 2:
-        last = parts[0]
-        first = " ".join(parts[1:])
-    elif len(parts) == 1:
-        last = parts[0]
-        first = ""
-    else:
-        last = first = ""
+    first = parts[0] if parts else ""
+    last = parts[-1] if len(parts) > 1 else ""
     return first, last
 
+def click_yes_execute_search():
+    """Clicks the 'Yes, Execute Search' button using pyautogui."""
+    time.sleep(1.5)  # Small pause to let the dialog load
+    pyautogui.moveTo(CONFIRM_BTN_X, CONFIRM_BTN_Y, duration=0.2)
+    pyautogui.click()
+    time.sleep(1)  # Pause to let search process
+
+def get_phone_numbers_from_skipgenie(driver):
+    """
+    Returns a list of phone numbers (text) under the 'Possible Phone Numbers' section.
+    """
+    phone_numbers = []
+    try:
+        # Locate the 'Possible Phone Numbers' h5
+        h5 = driver.find_element(By.XPATH, "//h5[contains(text(), 'Possible Phone Numbers')]")
+        parent_div = h5.find_element(By.XPATH, "./..")
+        phone_divs = parent_div.find_elements(By.CLASS_NAME, "mb-3")
+        for div in phone_divs:
+            try:
+                # Extract the <p> text, split by lines
+                p = div.find_element(By.TAG_NAME, "p")
+                lines = p.text.strip().splitlines()
+                if lines:
+                    # Format: "(612) 408-3611 (Wireless)"
+                    number = lines[0].strip()
+                    phone_type = lines[1].strip() if len(lines) > 1 else ""
+                    phone_numbers.append(f"{number} {phone_type}".strip())
+            except Exception as inner:
+                continue
+    except Exception as e:
+        print("⚠️ Could not extract phone numbers:", e)
+    return phone_numbers
+
 def search_skip_genie(first_name, last_name, street_address, zip_code, driver):
+    # Go to Skip Genie search page (already logged in)
     driver.get("https://web.skipgenie.com/user/search")
     time.sleep(2)
 
     # Fill First Name
-    driver.find_element(By.CSS_SELECTOR, "input[placeholder*='First Name']").send_keys(first_name)
+    first_name_input = driver.find_element(By.CSS_SELECTOR, "input[placeholder*='First Name']")
+    first_name_input.clear()
+    first_name_input.send_keys(first_name)
+
     # Fill Last Name
-    driver.find_element(By.CSS_SELECTOR, "input[placeholder*='Last Name']").send_keys(last_name)
+    last_name_input = driver.find_element(By.CSS_SELECTOR, "input[placeholder*='Last Name']")
+    last_name_input.clear()
+    last_name_input.send_keys(last_name)
+
     # Fill Street Address
-    driver.find_element(By.CSS_SELECTOR, "input[placeholder*='Street Address']").send_keys(street_address)
+    street_input = driver.find_element(By.CSS_SELECTOR, "input[placeholder*='Street Address']")
+    street_input.clear()
+    street_input.send_keys(street_address)
+
     # Fill Zip/Postal Code
-    driver.find_element(By.CSS_SELECTOR, "input[placeholder*='Zip/Postal Code']").send_keys(zip_code)
+    zip_input = driver.find_element(By.CSS_SELECTOR, "input[placeholder*='Zip/Postal Code']")
+    zip_input.clear()
+    zip_input.send_keys(str(zip_code))
+
     # Click "Get Info"
-    driver.find_element(By.CSS_SELECTOR, ".pu_btn_user_search").click()
+    get_info_btn = driver.find_element(By.CSS_SELECTOR, ".pu_btn_user_search")
+    driver.execute_script("arguments[0].click();", get_info_btn)
 
-    # --- Robustly Click the "Yes, Execute Search" Button with Hover/Animation Support ---
-    try:
-        WebDriverWait(driver, 15).until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, "button.pu_btn"))
-        )
-        time.sleep(1)  # Wait for any animation
+    # Wait for confirmation popup, then click "Yes, Execute Search"
+    time.sleep(2)
+    click_yes_execute_search()
 
-        all_buttons = driver.find_elements(By.CSS_SELECTOR, "button.pu_btn")
-        found = False
-        for btn in all_buttons:
-            btn_text = btn.text.strip()
-            print("BTN FOUND:", repr(btn_text))
-            if btn_text.startswith("Yes, Execute Search"):
-                try:
-                    # Hover over the button to trigger animation/enable
-                    actions = ActionChains(driver)
-                    actions.move_to_element(btn).perform()
-                    print("🟢 Hovered over button")
-                    time.sleep(1.5)  # Give animation/transition time
-
-                    # Now try a regular click
-                    btn.click()
-                    print("✅ Click after hover worked")
-                    found = True
-                    break
-                except Exception as e:
-                    print("⚠️ Click after hover failed:", e)
-                # Try JS click after hover if needed
-                try:
-                    driver.execute_script("arguments[0].click();", btn)
-                    print("✅ JS click after hover worked")
-                    found = True
-                    break
-                except Exception as e:
-                    print("⚠️ JS click after hover failed:", e)
-        if not found:
-            print("❌ Could not click any Yes, Execute Search button after hover.")
-    except Exception as e:
-        print("❌ Still could not click the confirmation button:", e)
-        all_buttons = driver.find_elements(By.CSS_SELECTOR, "button.pu_btn")
-        for btn in all_buttons:
-            print("BUTTON HTML:", btn.get_attribute("outerHTML"))
-        return ""
-
-    # Wait for results to load
+    # Wait for results to load (increase if your internet is slow)
     time.sleep(4)
-
-    try:
-        results_div = driver.find_element(By.CSS_SELECTOR, ".results-container")
-        results_text = results_div.text
-    except NoSuchElementException:
-        results_text = ""
-    return results_text
+    phone_numbers = get_phone_numbers_from_skipgenie(driver)
+    return phone_numbers
 
 def main():
-    input_path = "output/owners_split_classified.csv"
-    output_path = "output/skip_genie_results.csv"
-
-    df = pd.read_csv(input_path)
+    # Load your processed CSV with all rows split/classified
+    df = pd.read_csv("output/owners_split_classified.csv")
     individuals_df = df[df["Owner Type"] == "individual"].copy()
 
     driver = setup_driver()
-    driver.get("https://web.skipgenie.com/user/search")
 
-    input("\n🔑 Log in to Skip Genie in the opened browser. When you're on the search page, press ENTER here...")
+    # Pause for manual login (let user log in securely)
+    input("\n🔑 Log in to Skip Genie in the browser, navigate to the search page, then press Enter here to begin...")
 
     results = []
-
-    for idx, row in tqdm(individuals_df.iterrows(), total=len(individuals_df)):
+    for idx, row in individuals_df.iterrows():
         owner_name = row["Owner Name"]
         street_address = row.get("Address", "")
-        zip_code = str(row.get("ZIP Code", ""))
+        zip_code = str(row.get("ZIP Code", ""))  # Make sure zip is string
 
-        first_name, last_name = split_name(owner_name)
-        if not first_name or not last_name:
-            print(f"⏭️ Skipping {owner_name}: couldn't parse name.")
-            continue
+        # --- Reverse name if necessary! (last name, first name) ---
+        last_name, first_name = split_name(owner_name)
+        # If your input is already "First Last", use:
+        # first_name, last_name = split_name(owner_name)
 
-        print(f"🔎 Searching: {first_name} {last_name} | {street_address} | {zip_code}")
+        print(f"🔎  Searching: {first_name} {last_name} | {street_address} | {zip_code}")
+
         try:
-            result_text = search_skip_genie(
+            phone_numbers = search_skip_genie(
                 first_name, last_name, street_address, zip_code, driver
             )
             results.append({
@@ -133,7 +134,7 @@ def main():
                 "Last Name": last_name,
                 "Street Address": street_address,
                 "ZIP Code": zip_code,
-                "Skip Genie Result": result_text
+                "Phone Numbers": ", ".join(phone_numbers)
             })
         except Exception as e:
             print(f"❌ Error searching for {owner_name}: {e}")
@@ -143,19 +144,17 @@ def main():
                 "Last Name": last_name,
                 "Street Address": street_address,
                 "ZIP Code": zip_code,
-                "Skip Genie Result": f"ERROR: {e}"
+                "Phone Numbers": ""
             })
-
-        # Optional: Save every 20 records for crash protection
-        if idx % 20 == 0 and idx != 0:
-            pd.DataFrame(results).to_csv(output_path, index=False)
-            print(f"💾 Progress saved ({idx} records)")
-
-        time.sleep(random.uniform(10, 15))  # random pause
+        # Pause between each search (rate limiting)
+        time.sleep(random.uniform(*PAUSE_BETWEEN_SEARCHES))
 
     driver.quit()
-    pd.DataFrame(results).to_csv(output_path, index=False)
-    print(f"\n✅ Done! Saved as: {output_path}")
+
+    # Save all results
+    output_file = "output/skip_genie_results.csv"
+    pd.DataFrame(results).to_csv(output_file, index=False)
+    print(f"\n✅ Done! Saved as: {output_file}")
 
 if __name__ == "__main__":
     main()
