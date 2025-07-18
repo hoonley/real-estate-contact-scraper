@@ -1,51 +1,97 @@
-# Real Estate Owner Contact Enrichment Scraper
+Real Estate Owner Contact Enrichment Scraper
+Python automation suite for real estate contact enrichment and lead list creation.
+This tool processes spreadsheets of property records, classifies owner type, scrapes business registries for officer names, and automates phone number lookup via Skip Genie and other sources. Outputs a buyer-ready Excel or CSV file.
 
-This is a Python-based automation tool for enriching real estate lead data. Starting from a spreadsheet of owner/property information, the tool identifies whether each owner is a company or individual, extracts company officer names, and searches public people databases to retrieve phone numbers, emails, and addresses.
+Project Overview
+Input:
+CSV/Excel file containing, at minimum:
 
----
+Lender Name
 
-## 📌 Project Overview
+Owner Name(s)
 
-**Input**:  
-Excel spreadsheet containing:
-- Lender Name
-- Owner Name(s)
-- Property Address, City, Zip Code
+Property Address, City, Zip Code
 
-**Output**:  
-New Excel spreadsheet with:
-- Company Name
-- First and Last Name (for individuals)
-- Phone Numbers (from FastPeopleSearch, Skip Genie)
-- Email Address (if found)
-- Mailing Address
-- Previous Flip Address (from input)
+Output:
+Formatted Excel (or CSV) file with columns for:
 
----
+Company Name (if applicable)
 
-## 🔁 Workflow Steps
+First Name / Last Name (if individual)
 
-1. **Load Owner Data**
-   - Read Excel input file
-   - Determine if each owner is a person or a company
+Phone Numbers (all found)
 
-2. **Search Business Registry**
-   - For companies, search [bizfileonline.sos.ca.gov](https://bizfileonline.sos.ca.gov/search/business)
-   - Download most recent Statement of Information (PDF)
+Mailing Address (if found)
 
-3. **Parse Statement of Info**
-   - Extract `Manager or Member Name` and `CEO Name` from PDF
+Previous Flip Address (if included in input)
 
-4. **Look Up Contacts**
-   - Search extracted names on:
-     - [FastPeopleSearch.com](https://www.fastpeoplesearch.com)
-     - Skip Genie (requires login/API access)
-   - Collect all phone numbers, mailing addresses, and emails (if present)
+Email Address (if found)
 
-5. **Save Output**
-   - Format and write enriched data into a new Excel file
+Workflow Steps
+Data Import and Preparation
 
----
+Reads raw owner/property info from CSV (recommended for input compatibility).
 
-## 📁 Project Structure
+Classifies each row as "company" or "individual" using business keywords (case-insensitive) and exclusion of “TRUST”/“trust” endings.
 
+Splits multi-owner entries (with "/") into separate rows.
+
+For companies, flags for further officer name extraction.
+
+Company/Individual Parsing
+
+For companies: prepares for later search on bizfileonline.sos.ca.gov to extract officer/manager names.
+
+For individuals: splits owner name into first and last names (with support for reversed formats as needed).
+
+Automated Contact Lookup
+
+For every individual:
+
+Opens Skip Genie search page using Selenium.
+
+Auto-fills owner name, address, and zip code.
+
+Uses PyAutoGUI to click confirmation (“Yes, Execute Search”) for popups.
+
+Scrapes all “Possible Phone Numbers” (and types) from the results page, storing them in a single column (comma-separated).
+
+(Future: Includes logic for other sources, e.g., FastPeopleSearch.)
+
+Output Generation
+
+Consolidates all enriched contact info into a single output file (CSV or Excel).
+
+Populates company/first/last name, phone number(s), and any other available details.
+
+Buyers List Integration
+
+Optionally, fills out a pre-formatted “Buyers List” Excel sheet using results from skip_genie_results.csv.
+
+⚙️ Key Technologies & Features
+Python for all automation logic
+
+Pandas for fast data manipulation and file I/O
+
+Selenium for browser automation and form filling
+
+PyAutoGUI for UI automation (confirmation popups, clicks not handled by Selenium)
+
+Excel/CSV Integration for input and output flexibility
+
+Robust error handling and rate limiting to avoid lockouts and ensure reliability
+
+🚀 How to Use
+Prepare your CSV input file in the input/ folder (see template in repo).
+
+Run the main processing scripts in order:
+
+main.py: Cleans, classifies, and splits owner records, producing owners_split_classified.csv.
+
+scraper_skipgenie.py: Automates Skip Genie lookups for all individuals, scraping phone numbers into skip_genie_results.csv.
+
+Manual login to Skip Genie is required before scraping proceeds. Make sure your browser window does not move during automation.
+
+fill_buyers_list.py: Fills out the “Buyers List” Excel sheet using the phone numbers and owner details from skip_genie_results.csv.
+
+Review and use the final buyers list output.
