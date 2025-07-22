@@ -6,7 +6,7 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 
 # ===== CONFIG =====
-SCRAPERAPI_KEY = "063ec9ed7a89a258b8781370c63d951e"
+SCRAPERAPI_KEY = ""
 COMPANY_CSV = "output/sample_output4.csv"
 RESULTS_CSV = "output/bizfile_results.csv"
 SEARCH_URL = "https://bizfileonline.sos.ca.gov/search/business"
