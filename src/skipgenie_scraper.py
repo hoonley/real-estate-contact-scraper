@@ -10,6 +10,8 @@ from selenium.common.exceptions import NoSuchElementException, TimeoutException
 
 # ========== CONFIGURATION ==========
 PAUSE_BETWEEN_SEARCHES = (10, 15)  # seconds, random between searches
+SKIPGENIE_EMAIL = ""  # Add your email here
+SKIPGENIE_PASSWORD = ""  # Add your password here
 
 def setup_driver():
     options = webdriver.ChromeOptions()
@@ -22,7 +24,167 @@ def setup_driver():
     return driver
 
 
-def split_name(owner_name):
+def auto_login(driver, email, password):
+    """
+    Automatically fills in login form and handles reCAPTCHA
+    """
+    try:
+        print("🔐 Starting auto-login process...")
+        
+        # Fill email field
+        email_selectors = [
+            "input[placeholder*='Email']",
+            "input[type='email']",
+            "input[name='email']",
+            "#email",
+            "//input[contains(@placeholder, 'Email')]"
+        ]
+        
+        email_filled = False
+        for selector in email_selectors:
+            try:
+                if selector.startswith("//"):
+                    email_input = driver.find_element(By.XPATH, selector)
+                else:
+                    email_input = driver.find_element(By.CSS_SELECTOR, selector)
+                
+                email_input.clear()
+                email_input.send_keys(email)
+                print("✅ Filled email field")
+                email_filled = True
+                break
+            except:
+                continue
+        
+        if not email_filled:
+            print("❌ Could not find email field")
+            return False
+        
+        # Fill password field  
+        password_selectors = [
+            "input[placeholder*='Password']",
+            "input[type='password']", 
+            "input[name='password']",
+            "#password",
+            "//input[contains(@placeholder, 'Password')]"
+        ]
+        
+        password_filled = False
+        for selector in password_selectors:
+            try:
+                if selector.startswith("//"):
+                    password_input = driver.find_element(By.XPATH, selector)
+                else:
+                    password_input = driver.find_element(By.CSS_SELECTOR, selector)
+                
+                password_input.clear()
+                password_input.send_keys(password)
+                print("✅ Filled password field")
+                password_filled = True
+                break
+            except:
+                continue
+        
+        if not password_filled:
+            print("❌ Could not find password field")
+            return False
+        
+        # Handle reCAPTCHA - click the "I'm not a robot" checkbox
+        time.sleep(2)
+        recaptcha_selectors = [
+            "iframe[src*='recaptcha']",
+            ".recaptcha-checkbox-border",
+            ".recaptcha-checkbox",
+            "#recaptcha-anchor",
+            "//iframe[contains(@src, 'recaptcha')]"
+        ]
+        
+        recaptcha_clicked = False
+        for selector in recaptcha_selectors:
+            try:
+                if selector.startswith("//"):
+                    # For iframes, we need to switch to them
+                    if "iframe" in selector:
+                        iframe = driver.find_element(By.XPATH, selector)
+                        driver.switch_to.frame(iframe)
+                        # Look for the checkbox inside the iframe
+                        checkbox = driver.find_element(By.CSS_SELECTOR, ".recaptcha-checkbox-border")
+                        checkbox.click()
+                        driver.switch_to.default_content()  # Switch back
+                        print("✅ Clicked reCAPTCHA checkbox (iframe)")
+                        recaptcha_clicked = True
+                        break
+                else:
+                    if "iframe" in selector:
+                        iframe = driver.find_element(By.CSS_SELECTOR, selector)
+                        driver.switch_to.frame(iframe)
+                        checkbox = driver.find_element(By.CSS_SELECTOR, ".recaptcha-checkbox-border")
+                        checkbox.click()
+                        driver.switch_to.default_content()
+                        print("✅ Clicked reCAPTCHA checkbox (iframe)")
+                        recaptcha_clicked = True
+                        break
+                    else:
+                        checkbox = driver.find_element(By.CSS_SELECTOR, selector)
+                        checkbox.click()
+                        print("✅ Clicked reCAPTCHA checkbox")
+                        recaptcha_clicked = True
+                        break
+            except Exception as e:
+                continue
+        
+        if not recaptcha_clicked:
+            print("⚠️ Could not find reCAPTCHA - you may need to click it manually")
+            input("👆 Please click the reCAPTCHA 'I'm not a robot' checkbox, then press Enter...")
+        
+        # Wait a moment for reCAPTCHA to process
+        time.sleep(3)
+        
+        # Click login button
+        login_selectors = [
+            "button[type='submit']",
+            "input[type='submit']",
+            ".login-btn",
+            "button:contains('LOGIN')",
+            "//button[contains(text(), 'LOGIN')]",
+            "//button[contains(text(), 'Log in')]",
+            "//input[@value='LOGIN']"
+        ]
+        
+        login_clicked = False
+        for selector in login_selectors:
+            try:
+                if selector.startswith("//"):
+                    login_btn = driver.find_element(By.XPATH, selector)
+                else:
+                    login_btn = driver.find_element(By.CSS_SELECTOR, selector)
+                
+                driver.execute_script("arguments[0].click();", login_btn)
+                print("✅ Clicked login button")
+                login_clicked = True
+                break
+            except:
+                continue
+        
+        if not login_clicked:
+            print("❌ Could not find login button")
+            return False
+        
+        # Wait for login to complete
+        print("⏳ Waiting for login to complete...")
+        time.sleep(5)
+        
+        # Check if we're logged in by looking for search page or dashboard
+        if "search" in driver.current_url or "dashboard" in driver.current_url:
+            print("🎉 Login successful!")
+            return True
+        else:
+            print("⚠️ Login may have failed - check manually")
+            return False
+            
+    except Exception as e:
+        print(f"❌ Error during auto-login: {e}")
+        return False
     # Naive split: First word = first name, last word = last name
     parts = owner_name.strip().split()
     first = parts[0] if parts else ""
@@ -299,9 +461,21 @@ def main():
     individuals_df = df[df["Owner Type"] == "individual"].copy()
 
     driver = setup_driver()
+    
+    # Auto-login if credentials are provided
+    if SKIPGENIE_EMAIL and SKIPGENIE_PASSWORD:
+        print("🔐 Attempting auto-login...")
+        login_success = auto_login(driver, SKIPGENIE_EMAIL, SKIPGENIE_PASSWORD)
+        if not login_success:
+            print("⚠️ Auto-login failed, please log in manually")
+            input("🔐 Log in to Skip Genie manually, then press Enter to continue...")
+    else:
+        print("📝 No login credentials provided in config")
+        input("🔐 Log in to Skip Genie in the browser, navigate to the search page, then press Enter here to begin...")
 
-    # Pause for manual login (let user log in securely)
-    input("\n🔐 Log in to Skip Genie in the browser, navigate to the search page, then press Enter here to begin...")
+    # Navigate to search page
+    driver.get("https://web.skipgenie.com/user/search")
+    time.sleep(2)
 
     results = []
     for idx, row in individuals_df.iterrows():
